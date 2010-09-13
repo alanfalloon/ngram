@@ -1,0 +1,14 @@
+Name:                ngram
+Version:             0.0
+Description:         Generate N-grams
+License:             GPL
+License-file:        COPYING
+Author:              Alan Falloon
+Maintainer:          alan.falloon@gmail.com
+Build-Type:          Simple
+Cabal-Version:       >=1.6
+Executable ngram
+  Main-is:           Main.hs
+  Build-Tools:       alex
+  Build-Depends:     base, bytestring, array, containers
+  Other-Modules:     WordSplit
