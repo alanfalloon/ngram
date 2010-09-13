@@ -1,17 +1,21 @@
 {
 module WordSplit where
+import Data.Char
+import qualified Data.ByteString.Lazy.Char8 as B
 }
 
 %wrapper "basic-bytestring"
 
-$alpha = ['0-9a-zA-Z_]
+$alpha = ['0-9a-zA-Z_\-]
 
 tokens :-
 
-  $white+    ;
-  $alpha+    { \s -> s }
-  .          { \s -> s }
+  $white+                             ;
+  $alpha+                             { \s -> B.map toLower s }
+  \<[~\>]+\>                          { \s -> s }
+  \"[~\"]+\"                          { \s -> s }
+  .                                   { \s -> s }
 
 {
-sentences b = alexScanTokens b
+wordSplit b = alexScanTokens b
 }
