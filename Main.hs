@@ -8,7 +8,11 @@ import qualified Data.ByteString.Lazy.Char8 as B
 dot = B.pack "."
 
 sentenceEnds :: S.Set B.ByteString
-sentenceEnds = S.fromList [ dot, B.pack "!", B.pack "?", B.pack ";", B.pack ":" ]
+sentenceEnds = S.fromList [ dot
+                          , B.pack "!"
+                          , B.pack "?"
+                          , B.pack ":"
+                          ]
 
 isEnd :: B.ByteString -> Bool
 isEnd b = b `S.member` sentenceEnds
