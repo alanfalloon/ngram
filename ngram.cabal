@@ -10,5 +10,5 @@ Cabal-Version:       >=1.6
 Executable ngram
   Main-is:           Main.hs
   Build-Tools:       alex
-  Build-Depends:     base, bytestring, array, containers
-  Other-Modules:     WordSplit
+  Build-Depends:     base, bytestring, array, containers, random, mtl
+  Other-Modules:     WordSplit, ERandom

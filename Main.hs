@@ -1,10 +1,12 @@
 module Main where
 
 import WordSplit
+import ERandom
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Maybe
+import System.Random
 
 dot = B.pack "."
 comma = B.pack ","
@@ -58,18 +60,33 @@ insert (w1,w2,w3) t = fromJust $ addW w1 (addW w2 (addW w3 incC)) $ Just t
       addW w f v = Just $ M.alter f w $ fromMaybe M.empty v
       incC v = Just $ 1 + fromMaybe 0 v
 
-getChoices m0 w1 w2 = zip counts words
-    where
-      wordsCounts = fromMaybe [] $ do
-                      m1 <- M.lookup w1 m0
-                      m2 <- M.lookup w2 m1
-                      return $ M.toList m2
-      (words,counts) = unzip wordsCounts
+getChoicesMap m0 w1 w2 = fromMaybe M.empty $ do
+                           m1 <- M.lookup w1 m0
+                           M.lookup w2 m1
+getChoices m0 w1 w2 = uncurry (flip zip) $ unzip $ M.toList $ getChoicesMap m0 w1 w2
 
 main = do
   contents <- B.getContents
   let t :: [[Triple]]
       t = map (triples . normalizeSentence) $ sentences $ wordSplit contents
       trigrams = foldl (flip insert) M.empty $ concat t
-      c = getChoices trigrams dot (B.pack "the")
-  print c
+  w <- runERandomIO (randomSentence trigrams)
+  print $ unwords $ map B.unpack w
+
+randomSentence :: RandomGen g => Trigrams -> ERandomM g [B.ByteString]
+randomSentence trigrams = randS dot dot
+    where
+      randS w1 w2 = do
+        e <- entropyM
+        if e > 128 && hasDot then return [dot] else moreWords
+        where
+          choices' = getChoices trigrams w1 w2
+          choices = if null choices' then [(1,dot)] else choices'
+          choicesMap = getChoicesMap trigrams w1 w2
+          hasDot = dot `M.member` choicesMap
+          moreWords = do
+                      c <- eRandomEltM choices
+                      rest <- randS w2 c
+                      return (c:rest)
+                      
+  
