@@ -4,6 +4,7 @@ import WordSplit
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.ByteString.Lazy.Char8 as B
+import Data.Maybe
 
 dot = B.pack "."
 comma = B.pack ","
@@ -44,6 +45,31 @@ normalizeSentence s = [dot,dot] ++ concatMap normalizeClauses s ++ [dot]
       normalizeClauses w | w `S.member` clauseEnds = [comma,comma]
                          | otherwise               = [w]
 
+-- | extract the triples from the list
+triples :: [a] -> [(a,a,a)]
+triples (h1:r@(h2:h3:_)) = (h1,h2,h3) : triples r
+triples _ = []
+
+type Trigrams = M.Map B.ByteString (M.Map B.ByteString (M.Map B.ByteString Int))
+type Triple = (B.ByteString,B.ByteString,B.ByteString)
+insert :: Triple -> Trigrams -> Trigrams
+insert (w1,w2,w3) t = fromJust $ addW w1 (addW w2 (addW w3 incC)) $ Just t
+    where
+      addW w f v = Just $ M.alter f w $ fromMaybe M.empty v
+      incC v = Just $ 1 + fromMaybe 0 v
+
+getChoices m0 w1 w2 = zip counts words
+    where
+      wordsCounts = fromMaybe [] $ do
+                      m1 <- M.lookup w1 m0
+                      m2 <- M.lookup w2 m1
+                      return $ M.toList m2
+      (words,counts) = unzip wordsCounts
+
 main = do
   contents <- B.getContents
-  mapM_ (print . map B.unpack) (map normalizeSentence $ sentences $ wordSplit contents)
+  let t :: [[Triple]]
+      t = map (triples . normalizeSentence) $ sentences $ wordSplit contents
+      trigrams = foldl (flip insert) M.empty $ concat t
+      c = getChoices trigrams dot (B.pack "the")
+  print c
