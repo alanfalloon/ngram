@@ -4,7 +4,7 @@ test:
 
 all: dist/build/ngram/ngram
 test: dist/build/ngram/ngram
-	$< < COPYING
+	html2text -ascii On\ the\ Origin\ of\ Species.html | $<
 
 dist/setup-config: Setup.lhs ngram.cabal
 	runhaskell $< configure --user
