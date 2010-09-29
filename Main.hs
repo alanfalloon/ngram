@@ -8,8 +8,13 @@ import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Maybe
 import System.Random
 
+n :: Int
+n = 3
+
 dot = B.pack "."
 comma = B.pack ","
+
+startState = replicate (n-1) dot
 
 sentenceEnds :: S.Set B.ByteString
 sentenceEnds = S.fromList [ dot
@@ -36,57 +41,54 @@ sentences w = words : sentences rest'
       rest' = dropWhile isEnd rest
 
 -- | Convert the sentences to a normal form suitable for trigram
--- extraction. The sentence will start with 2 dots and end with a
+-- extraction. The sentence will start with n-1 dots and end with a
 -- single dot. This ensures that the start and end conditions for the
--- sentences are known. Clauses (such as parenthetical asides, or
--- dependant clauses) are separated using 2 commas so that their state
--- is separated.
+-- sentences are known.
 normalizeSentence :: [B.ByteString] -> [B.ByteString]
-normalizeSentence s = [dot,dot] ++ concatMap normalizeClauses s ++ [dot]
+normalizeSentence s = startState ++ s ++ [dot]
+
+-- | extract the n-grams from the list
+ngrams :: [a] -> [[a]]
+ngrams x | length x >= n = take n x : ngrams (tail x)
+         | otherwise     = []
+
+type Ngrams = M.Map Ngram Freq
+type Freq = M.Map B.ByteString Int
+type Ngram = [B.ByteString]
+insert :: Ngram -> Ngrams -> Ngrams
+insert ng t = M.alter add k t
     where
-      normalizeClauses w | w `S.member` clauseEnds = [comma,comma]
-                         | otherwise               = [w]
+      k = take (n-1) ng
+      [v] = drop (n-1) ng
+      add :: Maybe Freq -> Maybe Freq
+      add (Just m) = Just (M.insertWith (+) v 1 m)
+      add Nothing  = Just (M.singleton v 1)
 
--- | extract the triples from the list
-triples :: [a] -> [(a,a,a)]
-triples (h1:r@(h2:h3:_)) = (h1,h2,h3) : triples r
-triples _ = []
-
-type Trigrams = M.Map B.ByteString (M.Map B.ByteString (M.Map B.ByteString Int))
-type Triple = (B.ByteString,B.ByteString,B.ByteString)
-insert :: Triple -> Trigrams -> Trigrams
-insert (w1,w2,w3) t = fromJust $ addW w1 (addW w2 (addW w3 incC)) $ Just t
-    where
-      addW w f v = Just $ M.alter f w $ fromMaybe M.empty v
-      incC v = Just $ 1 + fromMaybe 0 v
-
-getChoicesMap m0 w1 w2 = fromMaybe M.empty $ do
-                           m1 <- M.lookup w1 m0
-                           M.lookup w2 m1
-getChoices m0 w1 w2 = uncurry (flip zip) $ unzip $ M.toList $ getChoicesMap m0 w1 w2
+getChoicesMap m0 state = fromMaybe M.empty $ M.lookup state m0
+getChoices m0 state = uncurry (flip zip) $ unzip $ M.toList $ getChoicesMap m0 state
 
 main = do
   contents <- B.getContents
-  let t :: [[Triple]]
-      t = map (triples . normalizeSentence) $ sentences $ wordSplit contents
+  let t :: [[Ngram]]
+      t = map (ngrams . normalizeSentence) $ sentences $ wordSplit contents
       trigrams = foldl (flip insert) M.empty $ concat t
   w <- runERandomIO (randomSentence trigrams)
   print $ unwords $ map B.unpack w
 
-randomSentence :: RandomGen g => Trigrams -> ERandomM g [B.ByteString]
-randomSentence trigrams = randS dot dot
+randomSentence :: RandomGen g => Ngrams -> ERandomM g [B.ByteString]
+randomSentence ngrams = randS startState
     where
-      randS w1 w2 = do
+      randS state = do
         e <- entropyM
         if e > 128 && hasDot then return [dot] else moreWords
         where
-          choices' = getChoices trigrams w1 w2
+          choices' = getChoices ngrams state
           choices = if null choices' then [(1,dot)] else choices'
-          choicesMap = getChoicesMap trigrams w1 w2
+          choicesMap = getChoicesMap ngrams state
           hasDot = dot `M.member` choicesMap
           moreWords = do
                       c <- eRandomEltM choices
-                      rest <- randS w2 c
+                      rest <- randS (tail state ++ [c])
                       return (c:rest)
                       
   
